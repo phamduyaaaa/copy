@@ -27,7 +27,7 @@ amcl:
     recovery_alpha_fast: 0.0
     recovery_alpha_slow: 0.0
     resample_interval: 1
-    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    robot_model_type: "nav2_amcl/DifferentialMotionModel"
     save_pose_rate: 0.5
     sigma_hit: 0.2
     tf_broadcast: true
@@ -49,6 +49,13 @@ amcl:
       z: 0.0
       yaw: 0.0
 
+map_server:
+  ros__parameters:
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: True
+
 bt_navigator:
   ros__parameters:
     global_frame: map
@@ -63,15 +70,14 @@ bt_navigator:
     path_blackboard_id: path
     navigators: ['navigate_to_pose', 'navigate_through_poses']
     navigate_to_pose:
-      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+      plugin: "nav2_bt_navigator/NavigateToPoseNavigator"
     navigate_through_poses:
-      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+      plugin: "nav2_bt_navigator/NavigateThroughPosesNavigator"
     error_code_name_prefixes: ["assisted_teleop", "backup", "compute_path", "dock_robot", "drive_on_heading", "follow_path", "nav_thru_poses", "nav_to_pose", "spin", "route", "undock_robot", "wait"]
 
 controller_server:
   ros__parameters:
     controller_frequency: 10.0
-    costmap_update_timeout: 0.30
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.001
@@ -79,21 +85,20 @@ controller_server:
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["general_goal_checker"]
     controller_plugins: ["FollowPath"]
-    use_realtime_priority: false
 
     progress_checker:
-      plugin: "nav2_controller::SimpleProgressChecker"
+      plugin: "nav2_controller/SimpleProgressChecker"
       required_movement_radius: 0.1
       movement_time_allowance: 10.0
 
     general_goal_checker:
       stateful: True
-      plugin: "nav2_controller::SimpleGoalChecker"
+      plugin: "nav2_controller/SimpleGoalChecker"
       xy_goal_tolerance: 0.15
       yaw_goal_tolerance: 0.1
 
     FollowPath:
-      plugin: "nav2_mppi_controller::MPPIController"
+      plugin: "nav2_mppi_controller/MPPIController"
       time_steps: 56
       model_dt: 0.1
       batch_size: 2000
@@ -137,7 +142,6 @@ local_costmap:
       height: 4
       resolution: 0.05
       footprint: "[[0.3, 0.2], [0.3, -0.2], [-0.3, -0.2], [-0.3, 0.2]]"
-      # SỬA: Dùng "/" cho STVL theo log hệ thống báo
       plugins: ["rgbd_obstacle_layer", "inflation_layer"]
       
       rgbd_obstacle_layer:
@@ -171,7 +175,7 @@ local_costmap:
           model_type: 0
 
       inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
+        plugin: "nav2_costmap_2d/InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.45
 
@@ -184,15 +188,14 @@ global_costmap:
       robot_base_frame: base_link
       resolution: 0.05
       track_unknown_space: true
-      # SỬA: Định dạng plugin cho StaticLayer trên Jazzy
-      plugins: ["static_layer", "obstacle_layer", "rgbd_obstacle_layer", "inflation_layer"]
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       
       static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
+        plugin: "nav2_costmap_2d/StaticLayer"
         map_subscribe_transient_local: True
       
       obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
+        plugin: "nav2_costmap_2d/ObstacleLayer"
         observation_sources: scan
         scan:
           topic: /scan_filter
@@ -201,21 +204,8 @@ global_costmap:
           marking: True
           data_type: "LaserScan"
 
-      rgbd_obstacle_layer:
-        plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
-        enabled: true
-        voxel_decay: 5.0
-        observation_sources: rgbd1_mark
-        rgbd1_mark:
-          data_type: PointCloud2
-          topic: /input_pointcloud
-          marking: true
-          clearing: true
-          obstacle_max_range: 3.0
-          voxel_filter: true
-
       inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
+        plugin: "nav2_costmap_2d/InflationLayer"
         cost_scaling_factor: 5.0
         inflation_radius: 0.5
 
@@ -224,7 +214,7 @@ planner_server:
     expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner" # Sửa :: thành /
+      plugin: "nav2_navfn_planner/NavfnPlanner"
       use_astar: true
 
 behavior_server:
@@ -234,15 +224,15 @@ behavior_server:
     cycle_frequency: 10.0
     behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
     spin:
-      plugin: "nav2_behaviors::Spin"
+      plugin: "nav2_behaviors/Spin"
     backup:
-      plugin: "nav2_behaviors::BackUp"
+      plugin: "nav2_behaviors/BackUp"
     drive_on_heading:
-      plugin: "nav2_behaviors::DriveOnHeading"
+      plugin: "nav2_behaviors/DriveOnHeading"
     wait:
-      plugin: "nav2_behaviors::Wait"
+      plugin: "nav2_behaviors/Wait"
     assisted_teleop:
-      plugin: "nav2_behaviors::AssistedTeleop"
+      plugin: "nav2_behaviors/AssistedTeleop"
 
 velocity_smoother:
   ros__parameters:
@@ -265,7 +255,6 @@ collision_monitor:
       type: "scan"
       topic: "scan_filter"
 
-# SỬA: Cấu hình Docking Server tối thiểu để không bị crash
 docking_server:
   ros__parameters:
     controller_frequency: 50.0
@@ -273,8 +262,8 @@ docking_server:
     fixed_frame: "odom"
     dock_plugins: ['simple_charging_dock']
     simple_charging_dock:
-      plugin: 'opennav_docking::SimpleChargingDock'
-    docks: ['home_dock'] # Phải có tên dock cụ thể
+      plugin: 'opennav_docking/SimpleChargingDock'
+    docks: ['home_dock']
     home_dock:
       type: 'simple_charging_dock'
       frame: map
