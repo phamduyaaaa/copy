@@ -66,8 +66,8 @@ bt_navigator:
 
 controller_server:
   ros__parameters:
-    # SỬA: Tăng tần số lên 20Hz để điều khiển mượt hơn và khớp với model_dt
-    controller_frequency: 20.0 
+    # QUAN TRỌNG: Tăng lên 20Hz (0.05s) để khớp với model_dt bên dưới
+    controller_frequency: 20.0
     costmap_update_timeout: 0.30
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
@@ -91,7 +91,7 @@ controller_server:
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
       time_steps: 56
-      # SỬA: Đặt model_dt bằng 1/controller_frequency (1/20 = 0.05)
+      # QUAN TRỌNG: model_dt phải bằng 1/controller_frequency (1/20 = 0.05)
       model_dt: 0.05
       batch_size: 2000
       vx_std: 0.2
