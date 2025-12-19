@@ -137,10 +137,11 @@ local_costmap:
       height: 4
       resolution: 0.05
       footprint: "[[0.3, 0.2], [0.3, -0.2], [-0.3, -0.2], [-0.3, 0.2]]"
+      # SỬA: Dùng "/" cho STVL theo log hệ thống báo
       plugins: ["rgbd_obstacle_layer", "inflation_layer"]
       
       rgbd_obstacle_layer:
-        plugin: "spatio_temporal_voxel_layer::SpatioTemporalVoxelLayer"
+        plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
         enabled: true
         voxel_decay: 2.0
         decay_model: 0
@@ -183,6 +184,7 @@ global_costmap:
       robot_base_frame: base_link
       resolution: 0.05
       track_unknown_space: true
+      # SỬA: Định dạng plugin cho StaticLayer trên Jazzy
       plugins: ["static_layer", "obstacle_layer", "rgbd_obstacle_layer", "inflation_layer"]
       
       static_layer:
@@ -200,7 +202,7 @@ global_costmap:
           data_type: "LaserScan"
 
       rgbd_obstacle_layer:
-        plugin: "spatio_temporal_voxel_layer::SpatioTemporalVoxelLayer"
+        plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
         enabled: true
         voxel_decay: 5.0
         observation_sources: rgbd1_mark
@@ -222,7 +224,7 @@ planner_server:
     expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
+      plugin: "nav2_navfn_planner/NavfnPlanner" # Sửa :: thành /
       use_astar: true
 
 behavior_server:
@@ -262,4 +264,19 @@ collision_monitor:
     scan:
       type: "scan"
       topic: "scan_filter"
+
+# SỬA: Cấu hình Docking Server tối thiểu để không bị crash
+docking_server:
+  ros__parameters:
+    controller_frequency: 50.0
+    base_frame: "base_link"
+    fixed_frame: "odom"
+    dock_plugins: ['simple_charging_dock']
+    simple_charging_dock:
+      plugin: 'opennav_docking::SimpleChargingDock'
+    docks: ['home_dock'] # Phải có tên dock cụ thể
+    home_dock:
+      type: 'simple_charging_dock'
+      frame: map
+      pose: [0.0, 0.0, 0.0]
 ```
