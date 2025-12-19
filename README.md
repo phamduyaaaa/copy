@@ -55,35 +55,17 @@ bt_navigator:
     robot_base_frame: base_link
     transform_tolerance: 0.5
     filter_duration: 0.3
-    default_nav_to_pose_bt_xml: "$(find-pkg-share omni_base_nav)/param/navigate_w_replanning_and_recovery.xml"
-    default_nav_through_poses_bt_xml: "$(find-pkg-share omni_base_nav)/param/navigate_w_replanning_and_round_robin_recovery.xml"
+    default_nav_to_pose_bt_xml: "navigate_w_replanning_and_recovery.xml"
+    default_nav_through_poses_bt_xml: "navigate_w_replanning_and_round_robin_recovery.xml"
     always_reload_bt_xml: false
     goal_blackboard_id: goal
     goals_blackboard_id: goals
     path_blackboard_id: path
     navigators: ['navigate_to_pose', 'navigate_through_poses']
-    navigate_to_pose:
-      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
-    navigate_through_poses:
-      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
-    error_code_name_prefixes:
-      - assisted_teleop
-      - backup
-      - compute_path
-      - dock_robot
-      - drive_on_heading
-      - follow_path
-      - nav_thru_poses
-      - nav_to_pose
-      - spin
-      - route
-      - undock_robot
-      - wait
 
 controller_server:
   ros__parameters:
     controller_frequency: 10.0
-    costmap_update_timeout: 0.30
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.001
@@ -91,7 +73,6 @@ controller_server:
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["general_goal_checker"]
     controller_plugins: ["FollowPath"]
-    use_realtime_priority: false
 
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
@@ -129,71 +110,11 @@ controller_server:
       motion_model: "DiffDrive"
       visualize: false
       regenerate_noises: false
-      TrajectoryVisualizer:
-        trajectory_step: 5
-        time_step: 3
-      TrajectoryValidator:
-        plugin: "mppi::DefaultOptimalTrajectoryValidator"
-        collision_lookahead_time: 2.0
-        consider_footprint: false
-      AckermannConstraints:
-        min_turning_r: 0.2
       critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
-      ConstraintCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 4.0
-      GoalCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0
-        threshold_to_consider: 1.4
-      GoalAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.0
-        threshold_to_consider: 0.5
-      PreferForwardCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0
-        threshold_to_consider: 0.5
-      CostCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.81
-        critical_cost: 300.0
-        consider_footprint: true
-        collision_cost: 1000000.0
-        near_goal_distance: 1.0
-        trajectory_point_step: 2
-      PathAlignCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 14.0
-        max_path_occupancy_ratio: 0.05
-        trajectory_point_step: 4
-        threshold_to_consider: 0.5
-        offset_from_furthest: 20
-        use_path_orientations: false
-      PathFollowCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0
-        offset_from_furthest: 5
-        threshold_to_consider: 1.4
-      PathAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 2.0
-        offset_from_furthest: 4
-        threshold_to_consider: 0.5
-        max_angle_to_furthest: 1.0
-        mode: 0
 
 local_costmap:
   local_costmap:
-    ros__parameters:  
+    ros__parameters:
       update_frequency: 5.0
       publish_frequency: 2.0
       global_frame: odom
@@ -233,11 +154,7 @@ local_costmap:
           obstacle_range: 3.0
           min_obstacle_height: 0.02
           max_obstacle_height: 2.0
-          expected_update_rate: 0.0
-          observation_persistence: 0.0
-          inf_is_valid: false
           filter: "passthrough"
-          voxel_min_points: 0
           clear_after_reading: true
         rgbd1_clear:
           data_type: PointCloud2
@@ -249,7 +166,6 @@ local_costmap:
           vertical_fov_angle: 0.8745
           horizontal_fov_angle: 1.048
           decay_acceleration: 15.0
-          model_type: 0
 
 global_costmap:
   global_costmap:
@@ -293,11 +209,6 @@ global_costmap:
           obstacle_range: 3.0
           min_obstacle_height: 0.02
           max_obstacle_height: 2.0
-          expected_update_rate: 0.0
-          observation_persistence: 0.0
-          inf_is_valid: false
-          filter: "passthrough"
-          voxel_min_points: 0
           clear_after_reading: true
         rgbd1_clear:
           data_type: PointCloud2
@@ -309,9 +220,36 @@ global_costmap:
           vertical_fov_angle: 0.8745
           horizontal_fov_angle: 1.048
           decay_acceleration: 15.0
-          model_type: 0
 
-# map_saver, planner_server, smoother_server, behavior_server, waypoint_follower,
-# velocity_smoother, collision_monitor, docking_server, loopback_simulator
-# giữ nguyên thông số như file gốc bạn gửi ban đầu, chỉ cập nhật STVL cho local/global costmap
+behavior_server:
+  ros__parameters:
+    plugin_names: ["back_up", "spin", "wait"]
+    plugin_types: ["nav2_behaviors::BackUp", "nav2_behaviors::Spin", "nav2_behaviors::Wait"]
+
+waypoint_follower:
+  ros__parameters:
+    plugin: "nav2_waypoint_follower::WaypointFollower"
+    follow_cycle_frequency: 10.0
+
+velocity_smoother:
+  ros__parameters:
+    plugin: "nav2_velocity_smoother::VelocitySmoother"
+    max_accel_x: 0.5
+    max_accel_y: 0.5
+    max_accel_theta: 0.3
+
+collision_monitor:
+  ros__parameters:
+    plugin: "nav2_collision_monitor::CollisionMonitor"
+    monitor_frequency: 5.0
+    collision_radius: 0.3
+
+docking_server:
+  ros__parameters:
+    plugin: "nav2_docking::Docking"
+
+loopback_simulator:
+  ros__parameters:
+    plugin: "nav2_loopback_simulator::LoopbackSimulator"
+
 ```
