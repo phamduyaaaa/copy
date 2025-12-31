@@ -1,117 +1,448 @@
 # copy
 ```bash
-import os
-import yaml
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node
-import xacro
+amcl:
+  ros__parameters:
+    use_sim_time: false
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_link"  # Đã sửa từ base_footprint thành base_link cho đồng bộ
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 100.0
+    laser_min_range: -1.0
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 3.0 # Đã tăng lên 3.0 để fix lỗi Extrapolation
+    introspection_mode: "disabled"
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: scan
 
-def generate_launch_description():
-    # =========================================================
-    # 1. THIẾT LẬP ĐƯỜNG DẪN & CONFIG
-    # =========================================================
-    option = 'medical' # Tên folder config của em
-    bringup_pkg_path = get_package_share_directory('bringup')
-    robot_desc_pkg_path = get_package_share_directory('robot_description')
-    rplidar_pkg_path = get_package_share_directory('rplidar_ros')
-    
-    # Đường dẫn các file config
-    ekf_config_path = os.path.join(bringup_pkg_path, 'config', option, 'ekf.yaml')
-    ports_yaml_file = os.path.join(bringup_pkg_path, 'config', option, 'hardware_ports.yaml')
-    odom_yaml_file  = os.path.join(bringup_pkg_path, 'config', option, 'odom.yaml')
-    xacro_file_path = os.path.join(robot_desc_pkg_path, 'urdf', 'my_robot.urdf.xacro')
+bt_navigator:
+  ros__parameters:
+    use_sim_time: false
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: odom
+    bt_loop_duration: 10
+    filter_duration: 0.3
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    transform_tolerance: 3.0 # Đã thêm để fix lỗi timeout
+    introspection_mode: "disabled"
+    navigators: ["navigate_to_pose", "navigate_through_poses"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    bt_search_directories:
+      - $(find-pkg-share nav2_bt_navigator)/behavior_trees
 
-    # =========================================================
-    # 2. ĐỌC DỮ LIỆU TỪ YAML
-    # =========================================================
-    # Đọc Hardware Ports
-    with open(ports_yaml_file, 'r') as f:
-        ports = yaml.safe_load(f)
-        
-    # Đọc Odom Params
-    with open(odom_yaml_file, 'r') as f:
-        odom_data = yaml.safe_load(f)
-        odom_params = odom_data['odom'] # Lấy dictionary bên trong key 'odom'
+controller_server:
+  ros__parameters:
+    use_sim_time: false
+    controller_frequency: 20.0
+    costmap_update_timeout: 1.0 # Tăng nhẹ
+    min_x_velocity_threshold: 0.05 # Tăng lên để thắng ma sát tĩnh
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    transform_tolerance: 3.0 # Quan trọng cho Controller
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+    path_handler_plugins: ["PathHandler"]
+    use_realtime_priority: false
+    speed_limit_topic: "speed_limit"
 
-    # Gán biến cho gọn
-    stm32_port = ports['stm32']['port']
-    stm32_baud = ports['stm32']['baudrate']
-    
-    rplidar_port = ports['rplidar']['port']
-    rplidar_baud = ports['rplidar']['baudrate']
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
 
-    # =========================================================
-    # 3. NODE: ROBOT STATE PUBLISHER (URDF)
-    # =========================================================
-    # Xử lý file Xacro thành XML
-    robot_description_config = xacro.process_file(xacro_file_path)
-    robot_description_xml = robot_description_config.toxml()
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+      path_length_tolerance: 1.0
 
-    robot_state_publisher_node = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='screen',
-        parameters=[{'robot_description': robot_description_xml}]
-    )
+    PathHandler:
+      plugin: "nav2_controller::FeasiblePathHandler"
+      prune_distance: 2.0
+      enforce_path_inversion: False
+      enforce_path_rotation: False
+      inversion_xy_tolerance: 0.2
+      inversion_yaw_tolerance: 0.4
+      minimum_rotation_angle: 0.785
+      reject_unit_path: False
 
-    # =========================================================
-    # 4. NODE: LIDAR (RPLIDAR)
-    # =========================================================
-    rplidar_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(rplidar_pkg_path, 'launch', 'rplidar.launch.py') # Dùng file generic cho an toàn
-        ),
-        launch_arguments={
-            'serial_port': rplidar_port,
-            'serial_baudrate': str(rplidar_baud),
-            'frame_id': 'laser_frame',
-            'angle_compensate': 'true',
-            'scan_mode': 'Standard'
-        }.items()
-    )
+    FollowPath:
+      plugin: "nav2_mppi_controller::MPPIController"
+      time_steps: 56
+      model_dt: 0.05
+      batch_size: 1000 # Giảm từ 2000 xuống 1000 để nhẹ máy hơn
+      ax_max: 3.0
+      ax_min: -3.0
+      ay_max: 3.0
+      ay_min: -3.0
+      az_max: 3.5
+      vx_std: 0.2
+      vy_std: 0.2
+      wz_std: 0.4
+      vx_max: 0.5
+      vx_min: -0.35
+      vy_max: 0.5
+      wz_max: 1.9
+      iteration_count: 1
+      temperature: 0.3
+      gamma: 0.015
+      motion_model: "DiffDrive"
+      visualize: true
+      publish_optimal_trajectory: true
+      regenerate_noises: true
+      TrajectoryVisualizer:
+        trajectory_step: 5
+        time_step: 3
+      TrajectoryValidator:
+        plugin: "mppi::DefaultOptimalTrajectoryValidator"
+        collision_lookahead_time: 2.0
+        consider_footprint: false
+      AckermannConstraints:
+        min_turning_r: 0.2
+      critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 4.0
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 1.4
+      GoalAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0
+        threshold_to_consider: 0.5
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 0.5
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.81
+        near_collision_cost: 253
+        critical_cost: 300.0
+        consider_footprint: false
+        collision_cost: 1000000.0
+        near_goal_distance: 1.0
+        trajectory_point_step: 2
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 14.0
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 20
+        use_path_orientations: false
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        offset_from_furthest: 5
+        threshold_to_consider: 1.4
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 2.0
+        offset_from_furthest: 4
+        threshold_to_consider: 0.5
+        max_angle_to_furthest: 1.0
+        mode: 0
 
-    # =========================================================
-    # 5. NODE: STM32 FULL BRIDGE (Driver Duy Nhất)
-    # =========================================================
-    # Node này thay thế cho cả stm32_bridge cũ và odom_node
-    # Nó vừa gửi cmd_vel xuống, vừa nhận odom/imu lên
-    stm32_bridge_full_node = Node(
-        package='bringup',
-        executable='stm32_bridge_full', # Phải khớp tên trong setup.py
-        name='stm32_driver',            # Đặt tên gì cũng được
-        output='screen',
-        parameters=[
-            # Tham số kết nối
-            {'port': stm32_port},
-            {'baudrate': stm32_baud},
-            # Tham số vật lý (truyền nguyên dict từ odom.yaml vào)
-            odom_params
-        ]
-    )
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: false
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 3
+      height: 3
+      resolution: 0.05
+      robot_radius: 0.22
+      transform_tolerance: 3.0 # Fix lỗi
+      plugins: ["voxel_layer", "inflation_layer"]
+      filters: ["keepout_filter"]
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: False # Tắt tạm thời nếu chưa có map filter
+        filter_info_topic: "keepout_costmap_filter_info"
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.70
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        publish_voxel_map: True
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      always_send_full_costmap: True
+      introspection_mode: "disabled"
 
-    # =========================================================
-    # 6. NODE: EKF (Robot Localization)
-    # =========================================================
-    ekf_node = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='ekf_filter_node',
-        output='screen',
-        parameters=[ekf_config_path],
-        remappings=[('odometry/filtered', 'odom')]
-    )
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: false
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      robot_radius: 0.22
+      resolution: 0.05
+      track_unknown_space: true
+      transform_tolerance: 3.0 # Fix lỗi
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      filters: ["keepout_filter", "speed_filter"]
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: False
+        filter_info_topic: "keepout_costmap_filter_info"
+      speed_filter:
+        plugin: "nav2_costmap_2d::SpeedFilter"
+        enabled: False
+        filter_info_topic: "speed_costmap_filter_info"
+        speed_limit_topic: "speed_limit"
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.7
+      always_send_full_costmap: True
+      introspection_mode: "disabled"
 
-    # =========================================================
-    # 7. KHỞI CHẠY
-    # =========================================================
-    return LaunchDescription([
-        robot_state_publisher_node,
-        rplidar_launch,
-        stm32_bridge_full_node, # Chỉ chạy 1 node driver này
-        ekf_node
-    ])
+map_server:
+  ros__parameters:
+    use_sim_time: false
+    introspection_mode: "disabled"
+
+map_saver:
+  ros__parameters:
+    use_sim_time: false
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: True
+    introspection_mode: "disabled"
+
+planner_server:
+  ros__parameters:
+    use_sim_time: false
+    allow_partial_planning: false
+    expected_planner_frequency: 20.0
+    planner_plugins: ["GridBased"]
+    costmap_update_timeout: 2.0 # Tăng lên
+    introspection_mode: "disabled"
+    GridBased:
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+smoother_server:
+  ros__parameters:
+    use_sim_time: false
+    smoother_plugins: ["simple_smoother", "route_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      refinement_num: 2
+      enforce_path_inversion: True
+      do_refinement: True
+    route_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      refinement_num: 5
+      enforce_path_inversion: False
+      do_refinement: True
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: false
+    local_costmap_topic: local_costmap/costmap_raw
+    global_costmap_topic: global_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
+      acceleration_limit: 2.5
+      deceleration_limit: -2.5
+      minimum_speed: 0.10
+    drive_on_heading:
+      plugin: "nav2_behaviors::DriveOnHeading"
+      acceleration_limit: 2.5
+      deceleration_limit: -2.5
+      minimum_speed: 0.10
+    wait:
+      plugin: "nav2_behaviors::Wait"
+    assisted_teleop:
+      plugin: "nav2_behaviors::AssistedTeleop"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_link
+    transform_tolerance: 3.0 # Fix lỗi
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: false
+    loop_rate: 20
+    stop_on_failure: false
+    introspection_mode: "disabled"
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 200
+
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: false
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.5, 0.0, 2.0]
+    min_velocity: [-0.5, 0.0, -2.0]
+    max_accel: [2.5, 0.0, 3.2]
+    max_decel: [-2.5, 0.0, -3.2]
+    odom_topic: "odom"
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0
+
+collision_monitor:
+  ros__parameters:
+    use_sim_time: false
+    enabled: True
+    base_frame_id: "base_link" # Đồng bộ
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_out_topic: "cmd_vel"
+    transform_tolerance: 2.0
+    source_timeout: 1.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "local_costmap/published_footprint"
+      time_before_collision: 1.2
+      simulation_time_step: 0.1
+      min_points: 6
+      visualize: False
+      enabled: True
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "scan"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+
+# --- PHẦN QUAN TRỌNG NHẤT: LIFECYCLE MANAGER ---
+# Thiếu phần này là các node không bao giờ tự Active
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: false
+    autostart: true
+    node_names: ['map_server',
+                 'amcl',
+                 'controller_server',
+                 'smoother_server',
+                 'planner_server',
+                 'behavior_server',
+                 'bt_navigator',
+                 'waypoint_follower',
+                 'velocity_smoother',
+                 'collision_monitor']
+
+lifecycle_manager_localization:
+  ros__parameters:
+    use_sim_time: false
+    autostart: true
+    node_names: ['map_server', 'amcl']
 ```
