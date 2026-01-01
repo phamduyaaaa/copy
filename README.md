@@ -1,81 +1,321 @@
 # copy
 ```bash
-<?xml version="1.0"?>
-<robot name="my_mecanum_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+amcl:
+  ros__parameters:
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_footprint"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 100.0
+    laser_min_range: -1.0
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 0.5
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: scan
+    map_topic: map
+    set_initial_pose: false
+    always_reset_initial_pose: false
+    first_map_only: false
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
 
-  <xacro:property name="chassis_length" value="0.35"/>
-  <xacro:property name="chassis_width" value="0.25"/>
-  <xacro:property name="chassis_height" value="0.1"/>
-  
-  <xacro:property name="lidar_offset_x" value="-0.025"/> 
-  <xacro:property name="lidar_offset_z" value="0.08"/> 
-  <xacro:property name="imu_offset_z" value="0.05"/>
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_link
+    transform_tolerance: 0.5
+    filter_duration: 0.3
+    default_nav_to_pose_bt_xml: "$(find-pkg-share nav2_bt_navigator)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    default_nav_through_poses_bt_xml: "$(find-pkg-share nav2_bt_navigator)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    always_reload_bt_xml: false
+    goal_blackboard_id: goal
+    goals_blackboard_id: goals
+    path_blackboard_id: path
+    navigators: ['navigate_to_pose', 'navigate_through_poses']
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    error_code_name_prefixes:
+      - assisted_teleop
+      - backup
+      - compute_path
+      - dock_robot
+      - drive_on_heading
+      - follow_path
+      - nav_thru_poses
+      - nav_to_pose
+      - spin
+      - route
+      - undock_robot
+      - wait
 
-  <material name="blue">
-    <color rgba="0 0 0.8 1"/>
-  </material>
-  <material name="red">
-    <color rgba="0.8 0 0 1"/>
-  </material>
-  <material name="grey">
-    <color rgba="0.5 0.5 0.5 1"/>
-  </material>
+docking_server:
+  ros__parameters:
+    dock_plugins: ['nova_carter_dock']
+    nova_carter_dock:
+      plugin: 'opennav_docking::SimpleChargingDock'
+    docks: ['home_dock','flex_dock1', 'flex_dock2']
+    home_dock:
+      type: 'nova_carter_dock'
+      frame: map
+      pose: [0.0, 0.0, 0.0]
+    flex_dock1:
+      type: 'nova_carter_dock'
+      frame: map
+      pose: [10.0, 10.0, 0.0]
+    flex_dock2:
+      type: 'nova_carter_dock'
+      frame: map
+      pose: [30.0, 30.0, 0.0]
+    enable_stamped_cmd_vel: true
 
-  <link name="base_footprint"/>
+controller_server:
+  ros__parameters:
+    controller_frequency: 15.0        # tăng tần số controller nhẹ
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["goal_checker"]
+    controller_plugins: ["FollowPath"]
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.1
+      movement_time_allowance: 10.0
+    goal_checker:
+      stateful: true
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.05
+      yaw_goal_tolerance: 0.05
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: false
+      min_vel_x: 0.0
+      min_vel_y: 0.0
+      max_vel_x: 0.4
+      max_vel_y: 0.0
+      max_vel_theta: 1.0
+      min_speed_xy: 0.0
+      max_speed_xy: 0.3
+      min_speed_theta: 0.0
+      acc_lim_x: 0.5
+      acc_lim_y: 0.0
+      acc_lim_theta: 1.0
+      decel_lim_x: -0.5
+      decel_lim_y: 0.0
+      decel_lim_theta: -1.0
+      vx_samples: 15
+      vy_samples: 0
+      vtheta_samples: 20
+      sim_time: 1.0
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      xy_goal_tolerance: 0.05
+      trans_stopped_velocity: 0.05
+      short_circuit_trajectory_evaluation: true
+      stateful: true
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 8.0
+      PathAlign.scale: 8.0
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 8.0
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 8.0
+      GoalDist.scale: 8.0
+      RotateToGoal.scale: 8.0
+      RotateToGoal.slowing_factor: 2.0
+      RotateToGoal.lookahead_time: -1.0
+    enable_stamped_cmd_vel: true
 
-  <joint name="base_joint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
-    <origin xyz="0 0 ${chassis_height/2}" rpy="0 0 0"/>
-  </joint>
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 3
+      height: 3
+      resolution: 0.05
+      robot_radius: 0.25
+      footprint: "[ [0.2, 0.15], [0.2, -0.15], [-0.2, -0.15], [-0.2, 0.15] ]"
+      plugins: ["obstacle_layer", "voxel_layer", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.5
+        cost_scaling_factor: 5.0
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        publish_voxel_map: true
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        map_subscribe_transient_local: true
+      always_send_full_costmap: true
 
-  <link name="base_link">
-    <visual>
-      <geometry>
-        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
-      </geometry>
-      <material name="blue"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-    </visual>
-    <visual>
-        <geometry>
-            <box size="0.05 0.05 0.05"/>
-        </geometry>
-        <origin xyz="${chassis_length/2 - 0.025} 0 ${chassis_height/2 + 0.025}" rpy="0 0 0"/>
-        <material name="red"/>
-    </visual>
-  </link>
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      transform_tolerance: 0.5
+      robot_radius: 0.25
+      footprint: "[ [0.2, 0.15], [0.2, -0.15], [-0.2, -0.15], [-0.2, 0.15] ]"
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "voxel_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        publish_voxel_map: true
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        transform_tolerance: 0.1
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.5
+        cost_scaling_factor: 5.0
+      always_send_full_costmap: true
 
-  <joint name="lidar_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="laser_frame"/> 
-    <origin xyz="${lidar_offset_x} 0 ${lidar_offset_z}" rpy="0 0 0"/>
-  </joint>
+map_server:
+  ros__parameters:
+    yaml_filename: "map.yaml"
 
-  <link name="laser_frame">
-    <visual>
-      <geometry>
-        <cylinder radius="0.03" length="0.04"/>
-      </geometry>
-      <material name="red"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-    </visual>
-  </link>
+map_saver:
+  ros__parameters:
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: true
 
-  <joint name="imu_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="imu_link"/>
-    <origin xyz="0 0 ${imu_offset_z}" rpy="0 0 0"/>
-  </joint>
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 10.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
 
-  <link name="imu_link">
-    <visual>
-      <geometry>
-        <box size="0.02 0.02 0.01"/>
-      </geometry>
-      <material name="grey"/>
-    </visual>
-  </link>
+behavior_server:
+  ros__parameters:
+    local_costmap_topic: local_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_costmap_topic: global_costmap/costmap_raw
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait", "assisted_teleop"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors::DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors::Wait"
+    assisted_teleop:
+      plugin: "nav2_behaviors::AssistedTeleop"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_link
+    transform_timeout: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+    enable_stamped_cmd_vel: true
 
-</robot>
 ```
