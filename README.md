@@ -1,85 +1,96 @@
 # copy
 ```bash
-import rclpy
-from rclpy.node import Node
+import os
 
-from geometry_msgs.msg import Twist, TwistStamped
-from sensor_msgs.msg import Joy
-import rcl_interfaces.msg
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
+def generate_launch_description():
+    # 1. Định nghĩa tên package của bạn
+    package_name = 'navigation2_config'
+    
+    # 2. Lấy đường dẫn đến các thư mục cần thiết
+    pkg_share = get_package_share_directory(package_name)
+    nav2_bringup_dir = get_package_share_directory('nav2_bringup')
 
-class TeleopPS3(Node):
+    # 3. Định nghĩa đường dẫn mặc định tới file Map, Param và RViz dựa trên cấu trúc tree của bạn
+    # Đường dẫn: src/navigation2_config/map/map.yaml
+    default_map_path = os.path.join(pkg_share, 'map', 'map.yaml')
+    
+    # Đường dẫn: src/navigation2_config/param/nav2_params_custom.yaml
+    default_params_file_path = os.path.join(pkg_share, 'param', 'nav2_params_custom.yaml')
+    
+    # Đường dẫn: src/navigation2_config/rviz/navigation2_config.rviz
+    default_rviz_config_path = os.path.join(pkg_share, 'rviz', 'navigation2_config.rviz')
 
-    def __init__(self):
-        super().__init__('teleop_ps3')
+    # 4. Khởi tạo các LaunchConfiguration
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    map_yaml_file = LaunchConfiguration('map')
+    params_file = LaunchConfiguration('params_file')
+    autostart = LaunchConfiguration('autostart')
+    use_composition = LaunchConfiguration('use_composition')
 
-        # Parameters
-        read_only = rcl_interfaces.msg.ParameterDescriptor(read_only=True)
+    # 5. Khai báo các tham số launch (Arguments)
+    declare_use_sim_time_cmd = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='false',
+        description='Use simulation (Gazebo) clock if true')
 
-        self.stamped = self.declare_parameter(
-            'stamped', True, read_only).value
-        self.frame_id = self.declare_parameter(
-            'frame_id', '', read_only).value
-        self.speed = self.declare_parameter(
-            'speed', 0.5, read_only).value
-        self.turn = self.declare_parameter(
-            'turn', 1.0, read_only).value
+    declare_map_yaml_cmd = DeclareLaunchArgument(
+        'map',
+        default_value=default_map_path,
+        description='Full path to map file to load')
 
-        if not self.stamped and self.frame_id:
-            raise RuntimeError(
-                "'frame_id' can only be set when 'stamped' is True")
+    declare_params_file_cmd = DeclareLaunchArgument(
+        'params_file',
+        default_value=default_params_file_path,
+        description='Full path to the ROS2 parameters file to use for all launched nodes')
 
-        # Message type
-        if self.stamped:
-            self.TwistMsg = TwistStamped
-        else:
-            self.TwistMsg = Twist
+    declare_autostart_cmd = DeclareLaunchArgument(
+        'autostart',
+        default_value='true',
+        description='Automatically startup the nav2 stack')
+    
+    declare_use_composition_cmd = DeclareLaunchArgument(
+        'use_composition',
+        default_value='True',
+        description='Whether to use composed bringup')
 
-        self.pub = self.create_publisher(self.TwistMsg, 'cmd_vel', 10)
-        self.sub = self.create_subscription(
-            Joy, 'joy', self.joy_callback, 10)
+    # 6. Gọi launch file chính của Nav2 (bringup_launch.py)
+    # File này sẽ tự động chạy amcl, map_server, controller, planner, behavior_server, v.v.
+    nav2_bringup_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(nav2_bringup_dir, 'launch', 'bringup_launch.py')),
+        launch_arguments={
+            'map': map_yaml_file,
+            'use_sim_time': use_sim_time,
+            'params_file': params_file,
+            'autostart': autostart,
+            'use_composition': use_composition,
+            'use_respawn': 'False'
+        }.items()
+    )
 
-        self.get_logger().info("Teleop PS3 started")
+    # 7. Chạy RViz2 với file config của bạn
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', default_rviz_config_path],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen'
+    )
 
-    def joy_callback(self, joy: Joy):
-        msg = self.TwistMsg()
-
-        if self.stamped:
-            twist = msg.twist
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.header.frame_id = self.frame_id
-        else:
-            twist = msg
-
-        # === AXIS MAPPING (PS3) ===
-        # Left stick: linear x/y
-        linear_x = joy.axes[1]        # forward/back
-        linear_y = joy.axes[0]        # left/right
-
-        # Right stick: angular z
-        angular_z = joy.axes[3]       # rotate
-
-        twist.linear.x = linear_x * self.speed
-        twist.linear.y = linear_y * self.speed
-        twist.linear.z = 0.0
-
-        twist.angular.x = 0.0
-        twist.angular.y = 0.0
-        twist.angular.z = angular_z * self.turn
-
-        self.pub.publish(msg)
-
-
-def main():
-    rclpy.init()
-    node = TeleopPS3()
-    rclpy.spin(node)
-
-    node.destroy_node()
-    rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main()
-
+    return LaunchDescription([
+        declare_use_sim_time_cmd,
+        declare_map_yaml_cmd,
+        declare_params_file_cmd,
+        declare_autostart_cmd,
+        declare_use_composition_cmd,
+        nav2_bringup_launch,
+        rviz_node
+    ])
 ```
