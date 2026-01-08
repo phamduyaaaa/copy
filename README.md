@@ -1,272 +1,394 @@
 # copy
 ```bash
-"""
-Copyright (c) 2026 Duy Pham
-All rights reserved.
+amcl:
+  ros__parameters:
+    alpha1: 0.05
+    alpha2: 0.05
+    alpha3: 0.1
+    alpha4: 0.1
+    alpha5: 0.05
+    base_frame_id: "base_footprint"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 3.5
+    laser_min_range: 0.1
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.03
+    pf_z: 0.95
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    # Dùng Omni cho Mecanum là đúng
+    robot_model_type: "nav2_amcl::OmniMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 1.5 # Tăng lên để tránh lỗi TF
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: scan
+    map_topic: map
+    set_initial_pose: false
+    always_reset_initial_pose: false
+    first_map_only: false
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
 
-Author: Duy Pham
-Contact: duypham.robotics@gmail.com
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_link
+    transform_tolerance: 1.0 # Tăng lên
+    filter_duration: 0.3
+    default_nav_to_pose_bt_xml: "$(find-pkg-share nav2_bt_navigator)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    default_nav_through_poses_bt_xml: "$(find-pkg-share nav2_bt_navigator)/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml"
+    always_reload_bt_xml: false
+    goal_blackboard_id: goal
+    goals_blackboard_id: goals
+    path_blackboard_id: path
+    navigators: ['navigate_to_pose', 'navigate_through_poses']
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    error_code_name_prefixes:
+      - assisted_teleop
+      - backup
+      - compute_path
+      - dock_robot
+      - drive_on_heading
+      - follow_path
+      - nav_thru_poses
+      - nav_to_pose
+      - spin
+      - route
+      - undock_robot
+      - wait
 
-This software is proprietary and confidential.
-Unauthorized copying, modification, distribution, or use of this software,
-via any medium, is strictly prohibited without prior written permission
-from the author.
+docking_server:
+  ros__parameters:
+    dock_plugins: ['nova_carter_dock']
+    nova_carter_dock:
+      plugin: 'opennav_docking::SimpleChargingDock'
+    docks: ['home_dock','flex_dock1', 'flex_dock2']
+    home_dock:
+      type: 'nova_carter_dock'
+      frame: map
+      pose: [0.0, 0.0, 0.0]
+    flex_dock1:
+      type: 'nova_carter_dock'
+      frame: map
+      pose: [10.0, 10.0, 0.0]
+    flex_dock2:
+      type: 'nova_carter_dock'
+      frame: map
+      pose: [30.0, 30.0, 0.0]
+    enable_stamped_cmd_vel: true
 
-This software is provided "as is" without warranty of any kind.
-"""
-#!/usr/bin/env python3
-"""
-STM32 FULL BRIDGE FOR MECANUM ROBOT
-FIXED: KINEMATICS FORMULA (Swapped Vy and Wz logic)
-"""
-import rclpy
-from rclpy.node import Node
-from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Imu
-from geometry_msgs.msg import TwistStamped, Quaternion
-import serial
-import math
-import struct
-import time
+controller_server:
+  ros__parameters:
+    controller_frequency: 10.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["goal_checker"]
+    controller_plugins: ["FollowPath"]
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.1
+      movement_time_allowance: 10.0
+    goal_checker:
+      stateful: true
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: true
+      min_vel_x: 0.0
+      min_vel_y: -0.2 # Cho phép đi ngang (âm)
+      max_vel_x: 0.6
+      max_vel_y: 0.2
+      max_vel_theta: 1.0
+      min_speed_xy: 0.0
+      max_speed_xy: 0.6
+      min_speed_theta: 0.0
+      acc_lim_x: 1.0
+      acc_lim_y: 1.0
+      acc_lim_theta: 1.5
+      decel_lim_x: -1.0
+      decel_lim_y: -1.0
+      decel_lim_theta: -1.5
+      vx_samples: 20
+      vy_samples: 20 # Tăng mẫu cho Y để robot tính toán đường đi ngang tốt hơn
+      vtheta_samples: 40
+      sim_time: 1.5
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 1.0 # Tăng lên để fix lỗi Extrapolation
+      xy_goal_tolerance: 0.05
+      trans_stopped_velocity: 0.25
+      short_circuit_trajectory_evaluation: true
+      stateful: true
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 0.02
+      PathAlign.scale: 32.0
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 24.0
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 32.0
+      GoalDist.scale: 24.0
+      RotateToGoal.scale: 32.0
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: -1.0
+    enable_stamped_cmd_vel: true
 
-# ================== UART PROTOCOL ==================
-START_BYTE = 0xFF
-STOP_BYTE  = 0xFE
-FRAME_LEN  = 17
-SCALE_CMD  = 100.0 
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 3
+      height: 3
+      resolution: 0.05
+      robot_radius: 0.2
+      footprint: "[ [0.175, 0.125], [0.175, -0.125], [-0.175, -0.125], [-0.175, 0.125] ]"
+      plugins: ["obstacle_layer", "voxel_layer", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.7
+        cost_scaling_factor: 10.0
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        publish_voxel_map: true
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        map_subscribe_transient_local: true
+      always_send_full_costmap: true
 
-def calc_checksum_xor(buf):
-    cs = buf[1]
-    for i in range(2, 15):
-        cs ^= buf[i]
-    return cs
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      transform_tolerance: 1.0 # Tăng lên
+      robot_radius: 0.2
+      footprint: "[ [0.175, 0.125], [0.175, -0.125], [-0.175, -0.125], [-0.175, 0.125] ]"
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "voxel_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        publish_voxel_map: true
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: true
+        transform_tolerance: 1.0 # Fix lỗi quan trọng ở đây
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.5
+        cost_scaling_factor: 5.0
+      always_send_full_costmap: true
 
-class STM32BridgeFull(Node):
-    def __init__(self):
-        super().__init__('stm32_bridge_full')
+map_server:
+  ros__parameters:
+    yaml_filename: "map.yaml"
 
-        # --- PARAMETERS ---
-        self.declare_parameter('port', '/dev/ttyUSB0')
-        self.declare_parameter('baudrate', 115200)
-        self.declare_parameter('wheel_radius', 0.048)
-        self.declare_parameter('lx', 0.235)
-        self.declare_parameter('ly', 0.20)
+map_saver:
+  ros__parameters:
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: true
 
-        port = self.get_parameter('port').value
-        baud = self.get_parameter('baudrate').value
-        self.r  = self.get_parameter('wheel_radius').value
-        self.lx = self.get_parameter('lx').value
-        self.ly = self.get_parameter('ly').value
-        self.geo_factor = self.lx + self.ly
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 10.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
 
-        # --- SERIAL CONNECTION ---
-        try:
-            self.ser = serial.Serial(port, baud, timeout=0.02)
-            self.get_logger().info(f"Connected to STM32 at {port}")
-        except serial.SerialException as e:
-            self.get_logger().fatal(f"Serial Error: {e}")
-            exit(1)
+behavior_server:
+  ros__parameters:
+    local_costmap_topic: local_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_costmap_topic: global_costmap/costmap_raw
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait", "assisted_teleop"]
+    spin:
+      plugin: "nav2_behaviors::Spin"
+    backup:
+      plugin: "nav2_behaviors::BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors::DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors::Wait"
+    assisted_teleop:
+      plugin: "nav2_behaviors::AssistedTeleop"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_link
+    transform_timeout: 1.0 # Tăng lên
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+    enable_stamped_cmd_vel: true
 
-        # --- ROS COMM ---
-        self.odom_pub = self.create_publisher(Odometry, '/wheel/odom', 10)
-        self.imu_pub  = self.create_publisher(Imu, '/imu/data', 10)
-        self.cmd_sub = self.create_subscription(TwistStamped, '/cmd_vel', self.cmd_vel_callback, 10)
+waypoint_follower:
+  ros__parameters:
+    loop_rate: 20
+    stop_on_failure: false
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: true
+      waypoint_pause_duration: 200
 
-        # --- STATE ---
-        self.x = 0.0
-        self.y = 0.0
-        self.th = 0.0
-        self.last_time = self.get_clock().now()
-        self.rx_buffer = bytearray()
-        
-        self.create_timer(0.02, self.read_uart) 
-        self.last_cmd_time = time.time()
-        self.create_timer(0.1, self.watchdog_callback)
+# THẦY ĐÃ TẮT (DISABLE) COLLISION MONITOR TẠM THỜI ĐỂ TRÁNH LỖI PHỨC TẠP
+collision_monitor:
+  ros__parameters:
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_out_topic: "cmd_vel"
+    transform_tolerance: 1.0 # Tăng lên
+    source_timeout: 5.0
+    base_shift_correction: true
+    stop_pub_timeout: 2.0
+    enable_stamped_cmd_vel: true
+    use_realtime_priority: false
+    polygons: ["PolygonStop", "PolygonSlow", "FootprintApproach"]
+    PolygonStop:
+      type: "circle"
+      radius: 0.1
+      action_type: "stop"
+      min_points: 4
+      visualize: true
+      polygon_pub_topic: "polygon_stop"
+      enabled: false # TẠM TẮT
+    PolygonSlow:
+      type: "polygon"
+      points: "[[0.1, 0.1], [0.1, -0.1], [-0.1, -0.1], [-0.1, 0.1]]"
+      action_type: "slowdown"
+      min_points: 4
+      slowdown_ratio: 0.3
+      visualize: true
+      polygon_pub_topic: "polygon_slowdown"
+      enabled: false # TẠM TẮT
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"
+      time_before_collision: 2.0
+      simulation_time_step: 0.02
+      min_points: 6
+      visualize: False
+      enabled: false # TẠM TẮT
+    observation_sources: ["scan"]
+    scan:
+      source_timeout: 0.2
+      type: "scan"
+      topic: "/scan"
+      enabled: true
 
-    # --- TX ---
-    def cmd_vel_callback(self, msg):
-        self.last_cmd_time = time.time()
-        vx = msg.twist.linear.x
-        vy = msg.twist.linear.y
-        az = msg.twist.angular.z
-
-        vx_i = int(vx * SCALE_CMD)
-        vy_i = int(vy * SCALE_CMD)
-        az_i = int(az * SCALE_CMD)
-
-        vx_i = max(-32768, min(32767, vx_i))
-        vy_i = max(-32768, min(32767, vy_i))
-        az_i = max(-32768, min(32767, az_i))
-
-        payload = bytearray()
-        for val in (vx_i, vy_i, az_i):
-            payload.append((val >> 8) & 0xFF)
-            payload.append(val & 0xFF)
-
-        checksum = 0
-        for b in payload:
-            checksum ^= b
-
-        frame = bytearray()
-        frame.append(START_BYTE)
-        frame.extend(payload)
-        frame.append(checksum)
-        frame.append(STOP_BYTE)
-        self.ser.write(frame)
-
-    def watchdog_callback(self):
-        if time.time() - self.last_cmd_time > 0.5:
-            payload = bytearray([0,0, 0,0, 0,0])
-            frame = bytearray([START_BYTE]) + payload + bytearray([0, STOP_BYTE])
-            self.ser.write(frame)
-
-    # --- RX ---
-    def read_uart(self):
-        try:
-            if self.ser.in_waiting > 0:
-                self.rx_buffer.extend(self.ser.read(self.ser.in_waiting))
-
-            while len(self.rx_buffer) >= FRAME_LEN:
-                if self.rx_buffer[0] != START_BYTE:
-                    self.rx_buffer.pop(0)
-                    continue
-
-                frame = self.rx_buffer[:FRAME_LEN]
-                if frame[16] != STOP_BYTE:
-                    self.rx_buffer.pop(0)
-                    continue
-
-                if calc_checksum_xor(frame) != frame[15]:
-                    del self.rx_buffer[0]
-                    continue
-
-                parsed = self.parse_frame(frame)
-                self.update_odom(parsed)
-                self.update_imu(parsed["GOC"], parsed["GZ_IMU"])    
-                del self.rx_buffer[:FRAME_LEN]
-
-        except Exception as e:
-            self.get_logger().error(f"UART RX Error: {e}")
-            self.ser.reset_input_buffer()
-
-    def parse_frame(self, buf):
-        FR = struct.unpack(">h", bytes(buf[1:3]))[0]
-        FL = struct.unpack(">h", bytes(buf[3:5]))[0]
-        RR = struct.unpack(">h", bytes(buf[5:7]))[0]
-        RL = struct.unpack(">h", bytes(buf[7:9]))[0]
-        GOC = struct.unpack(">i", bytes(buf[9:13]))[0]
-        GZ  = struct.unpack(">h", buf[13:15])[0] 
-        return {"FR": FR, "FL": FL, "RR": RR, "RL": RL, "GOC": GOC, "GZ_IMU" : GZ}
-
-    def update_odom(self, data):
-        current_time = self.get_clock().now()
-        dt = (current_time - self.last_time).nanoseconds / 1e9
-        self.last_time = current_time
-
-        # 1. Tính toán vận tốc bánh (m/s)
-        scale = (2 * math.pi * self.r) / 60.0
-        v_fr = data["FR"] * scale
-        v_fl = data["FL"] * scale
-        v_rr = data["RR"] * scale
-        v_rl = data["RL"] * scale
-
-        # ==============================================================
-        # 2. KINEMATICS
-        # ==============================================================
-        
-        vx = (v_fr + v_fl + v_rr + v_rl) / 4.0
-        
-        vy = (-v_fl + v_fr + v_rl - v_rr) / 4.0
-
-        wz = (-v_fl + v_fr - v_rl + v_rr) / (4.0 * self.geo_factor)
-
-        # ==============================================================
-        # 3. BỘ LỌC CƯỠNG BỨC (HARD CONSTRAINT)
-        # ==============================================================
-        
-        # Nếu đang xoay nhanh (dùng wz mới tính)
-        if abs(wz) > 0.08:
-            # Mà vx, vy quá nhỏ -> Coi như nhiễu -> ép về 0
-            if abs(vx) < 0.08: vx = 0.0
-            if abs(vy) < 0.08: vy = 0.0
-
-        # Deadzone khi đứng yên
-        if abs(vx) < 0.005 and abs(vy) < 0.005 and abs(wz) < 0.01:
-            vx = 0.0; vy = 0.0; wz = 0.0
-
-        # 4. Tích phân (Debug only)
-        dx = vx * dt
-        dy = vy * dt
-        dth = wz * dt
-        self.x += dx * math.cos(self.th) - dy * math.sin(self.th)
-        self.y += dx * math.sin(self.th) + dy * math.cos(self.th)
-        self.th += dth
-
-        # 5. Đóng gói Odom
-        odom = Odometry()
-        odom.header.stamp = current_time.to_msg()
-        odom.header.frame_id = "odom"
-        odom.child_frame_id = "base_footprint"
-
-        odom.pose.pose.position.x = self.x
-        odom.pose.pose.position.y = self.y
-        odom.pose.pose.orientation = self.euler_to_quaternion(0, 0, self.th)
-
-        odom.twist.twist.linear.x = vx
-        odom.twist.twist.linear.y = vy
-        odom.twist.twist.angular.z = wz
-
-        # Covariance
-        odom.pose.covariance[0] = 0.01
-        odom.pose.covariance[7] = 0.01
-        odom.pose.covariance[35] = 0.1
-
-        odom.twist.covariance[0] = 0.05
-        odom.twist.covariance[7] = 0.05
-        odom.twist.covariance[35] = 0.02
-        
-        self.odom_pub.publish(odom)
-
-    def update_imu(self, goc_raw, gz_uart):
-        imu_msg = Imu()
-        imu_msg.header.stamp = self.get_clock().now().to_msg()
-        imu_msg.header.frame_id = "imu_link"
-        
-        yaw_deg = - goc_raw / 10.0 
-        yaw_rad = yaw_deg * (math.pi / 180.0)
-        
-        gz_dps = gz_uart / 100.0                
-        gz_rads = gz_dps * (math.pi / 180.0)
-
-        imu_msg.angular_velocity.z = gz_rads
-
-        imu_msg.orientation = self.euler_to_quaternion(0, 0, yaw_rad)
-        imu_msg.orientation_covariance = [9999.0, 0.0, 0.0, 0.0, 9999.0, 0.0, 0.0, 0.0, 0.001]
-        imu_msg.angular_velocity_covariance[0] = -1.0
-        imu_msg.linear_acceleration_covariance[0] = -1.0
-        self.imu_pub.publish(imu_msg)
-
-    def euler_to_quaternion(self, roll, pitch, yaw):
-        qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
-        qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
-        qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
-        qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
-        return Quaternion(x=qx, y=qy, z=qz, w=qw)
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = STM32BridgeFull()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        if hasattr(node, 'ser') and node.ser.is_open:
-            node.ser.close()
-        node.destroy_node()
-        rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
-
+velocity_smoother:
+  ros__parameters:
+    smoothing_frequency: 20.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.6, 0.2, 1.0]
+    min_velocity: [-0.6, -0.2, -1.0] # ĐÃ SỬA: Phải có dấu âm mới đi ngang trái được
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0
+    max_accel: [0.8, 0.8, 1.5]
+    max_decel: [-0.8, -0.8, -1.5]
+    odom_topic: "odom"
+    odom_duration: 0.1
+    use_realtime_priority: false
+    enable_stamped_cmd_vel: true
 ```
