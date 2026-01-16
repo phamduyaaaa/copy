@@ -9,12 +9,11 @@ from cv_bridge import CvBridge
 
 import cv2
 import numpy as np
-import math
 
 
 class LineFollower(Node):
     def __init__(self):
-        super().__init__('line_follower')
+        super().__init__('line_follower_slow_precise')
 
         self.bridge = CvBridge()
 
@@ -27,31 +26,34 @@ class LineFollower(Node):
 
         self.pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
-        # ===== CONTROL PARAM =====
-        self.lookahead_ratio = 0.6   # bỏ vùng mù
-        self.kp = 0.004
+        # ================= PHYSICAL PARAM =================
+        self.LOOKAHEAD_CM = 45.0        # > 34 cm vùng mù
+        self.CM_TO_PIXEL = 2.0          # 100 cm → 200 px BEV
+        self.lookahead_px = int(self.LOOKAHEAD_CM * self.CM_TO_PIXEL)
+
+        # ================= CONTROL =================
+        self.v = 0.10                   # CHẠY CHẬM
+        self.kp = 0.003
         self.kd = 0.001
         self.prev_error = 0.0
+        self.max_w = 0.5
 
-        self.v = 0.15
-        self.max_w = 0.8
-
-        self.get_logger().info("Line follower with visualization started")
+        self.get_logger().info("Line follower (slow & precise) started")
 
     def image_cb(self, msg):
         frame = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
-
         h, w, _ = frame.shape
 
         # ================= ROI =================
-        roi = frame[int(h*0.5):h, :]
+        roi = frame[int(h * 0.5):h, :]
 
         # ================= BEV =================
+        # ⚠️ BẠN CHỈ CẦN CHỈNH 4 ĐIỂM NÀY
         src = np.float32([
-            [w*0.3, 0],
-            [w*0.7, 0],
-            [w, h*0.5],
-            [0, h*0.5]
+            [w * 0.30, 0],
+            [w * 0.70, 0],
+            [w * 0.95, h * 0.5],
+            [w * 0.05, h * 0.5]
         ])
 
         dst = np.float32([
@@ -71,9 +73,11 @@ class LineFollower(Node):
         kernel = np.ones((5, 5), np.uint8)
         binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
-        # ================= LOOKAHEAD =================
-        look_y = int(binary.shape[0] * self.lookahead_ratio)
-        row = binary[look_y-5:look_y+5, :]
+        # ================= LOOK-AHEAD =================
+        look_y = binary.shape[0] - self.lookahead_px
+        look_y = np.clip(look_y, 20, binary.shape[0] - 20)
+
+        row = binary[look_y-4:look_y+4, :]
         xs = np.where(row > 0)[1]
 
         twist = Twist()
@@ -83,25 +87,27 @@ class LineFollower(Node):
             error = center_x - (binary.shape[1] // 2)
 
             d_error = error - self.prev_error
-            w_cmd = self.kp * error + self.kd * d_error
-            w_cmd = np.clip(w_cmd, -self.max_w, self.max_w)
+            w = self.kp * error + self.kd * d_error
+            w = np.clip(w, -self.max_w, self.max_w)
 
             twist.linear.x = self.v
-            twist.angular.z = -w_cmd
-
+            twist.angular.z = -w
             self.prev_error = error
 
-            # Vẽ debug
+            # ===== DEBUG DRAW =====
             cv2.circle(bev, (center_x, look_y), 6, (0, 0, 255), -1)
-            cv2.line(bev,
-                     (binary.shape[1]//2, binary.shape[0]),
-                     (center_x, look_y),
-                     (255, 0, 0), 2)
+            cv2.line(
+                bev,
+                (binary.shape[1] // 2, binary.shape[0]),
+                (center_x, look_y),
+                (255, 0, 0),
+                2
+            )
 
         else:
-            # mất line → quay chậm tìm
-            twist.linear.x = 0.05
-            twist.angular.z = 0.4
+            # Mất line → quay tìm rất chậm
+            twist.linear.x = 0.04
+            twist.angular.z = 0.3
 
         self.pub.publish(twist)
 
@@ -109,7 +115,6 @@ class LineFollower(Node):
         cv2.imshow("raw", frame)
         cv2.imshow("bev", bev)
         cv2.imshow("binary", binary)
-
         cv2.waitKey(1)
 
 
