@@ -1,13 +1,13 @@
 # copy
 ```bash
 cmake_minimum_required(VERSION 3.8)
-project(bringup_cpp)
+project(cpp_stm32_bridge)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+# 1. Tìm thư viện
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -16,17 +16,35 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+# Tìm LibSerial (Dùng PkgConfig cho chắc ăn như bài trước)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBSERIAL REQUIRED libserial)
+
+# 2. Tạo file thực thi
+add_executable(stm32_node src/stm32_node.cpp)
+
+# 3. Include directories
+target_include_directories(stm32_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${LIBSERIAL_INCLUDE_DIRS}
+)
+
+# 4. Link thư viện
+ament_target_dependencies(stm32_node
+  rclcpp
+  nav_msgs
+  geometry_msgs
+  sensor_msgs
+  tf2
+  tf2_ros
+)
+
+target_link_libraries(stm32_node ${LIBSERIAL_LIBRARIES})
+
+# 5. Install
+install(TARGETS stm32_node
+  DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
 ```
